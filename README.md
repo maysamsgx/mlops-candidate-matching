@@ -155,7 +155,7 @@ Our working demo integrates specific Machine Learning Design Patterns to solve t
 ## ⚡ Quick Start (The Demo)
 
 ### 🖥️ 1. One-Click Setup
-Your team can clone this repo and run the automated setup:
+You can clone this repo and run the automated setup:
 ```powershell
 ./run_system_e2e_demo.bat
 ```
