@@ -106,14 +106,13 @@ def train_model(df: pd.DataFrame):
             "feature_engineering": "Embeddings+OHE"
         })
         
-        # Save Model
-        mlflow.sklearn.log_model(pipeline, "model")
-        
-        # Register Model (Model Registry Pattern)
-        # Promoting the model to the central registry for version control.
-        # This allows the deployment stage to pick up the specific labeled version (e.g. "Staging").
-        encoded_model_uri = f"runs:/{mlflow.active_run().info.run_id}/model"
-        mlflow.register_model(encoded_model_uri, "CandidateMatcher")
+        # Save and Register Model (Model Registry Pattern)
+        # Promotions to the central registry for version control.
+        mlflow.sklearn.log_model(
+            sk_model=pipeline, 
+            artifact_path="model",
+            registered_model_name="CandidateMatcher"
+        )
 
     return pipeline, le
 

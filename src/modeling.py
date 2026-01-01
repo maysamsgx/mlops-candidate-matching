@@ -101,6 +101,10 @@ class CandidateMatcherEnsemble(BaseEstimator, ClassifierMixin):
             self.clf.fit(X, y)
         else:
             self.clf = VotingClassifier(estimators=trained_estimators, voting='soft')
+            self.clf.fit(X, y) # Ensure VotingClassifier is fit
+            
+        # [Misem]: Expose classes_ for the inference service to map probabilities to job roles.
+        self.classes_ = self.clf.classes_
             
         return self
         

@@ -4,3 +4,12 @@ __pycache__/
 .pytest_cache/
 models/
 mlflow.db
+mlruns/
+*.log
+*.csv
+*.parquet
+.prefect/
+pipeline_log*.txt
+item_checkpoint_valid.parquet
+!src/candidate_job_role_dataset.csv
+!data/candidate_job_role_dataset.csv

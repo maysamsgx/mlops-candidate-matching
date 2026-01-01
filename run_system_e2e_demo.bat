@@ -20,6 +20,7 @@ if %errorlevel% neq 0 (
 
 echo [3/4] Running Training Pipeline (Prefect)...
 echo    This might take a minute as we train the Ensemble...
+set PYTHONPATH=.
 .venv\Scripts\python src/workflow.py
 
 if %errorlevel% neq 0 (
@@ -31,6 +32,7 @@ if %errorlevel% neq 0 (
 echo [4/4] Starting Inference Server...
 echo    The API will be available at http://127.0.0.1:8000
 echo    Press Ctrl+C to stop the server.
+set PYTHONPATH=.
 .venv\Scripts\uvicorn src.inference:app --reload
 
 pause

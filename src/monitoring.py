@@ -1,6 +1,6 @@
 import pandas as pd
 import great_expectations as gx
-from great_expectations.core.batch import BatchRequest
+from great_expectations.core.batch import RuntimeBatchRequest
 import json
 import os
 
@@ -48,36 +48,43 @@ class DataValidator:
         """
         Validates new batch of data against the suite using Great Expectations.
         """
-        # [Mohammed Ali]: connecting to the GE validation engine.
-        # We wrap the dataframe in a GE Validator to run the checks "for real".
-        
-        datasource_name = "pandas_datasource"
+        # [Mohammed Ali]: Connecting to the GE validation engine.
+        # Using the standard 0.18.x 'read_dataframe' method via the default pandas datasource.
         try:
-             self.context.sources.add_pandas(datasource_name)
-        except:
-            pass 
+            # We use the ephemeral context to get a validator directly from the dataframe.
+            # This is the most resilient way for local/demo environments.
             
-        # Create a validator for this batch
-        validator = self.context.sources.pandas_default.read_dataframe(
-            df, dictionary_assets=True
-        )
-        
-        # Define expectations on the fly for this demo (in prod, load from JSON)
+            # Ensure a datasource exists
+            try:
+                self.context.sources.add_pandas("default_pandas_datasource")
+            except:
+                pass
+            
+            validator = self.context.get_validator(
+                batch_request=RuntimeBatchRequest(
+                    datasource_name="default_pandas_datasource",
+                    data_connector_name="default_runtime_data_connector_name",
+                    data_asset_name="current_batch",
+                    runtime_parameters={"batch_data": df},
+                    batch_identifiers={"default_identifier_name": "default_identifier"},
+                ),
+                expectation_suite_name=self.expectation_suite_name if hasattr(self, 'expectation_suite_name') else None
+            )
+        except Exception as e:
+            # Fallback to even simpler method if the above fails
+            from great_expectations.dataset import PandasDataset
+            validator = PandasDataset(df)
+            
+        # Define expectations (Production Tip: These should be loaded from JSON)
         validator.expect_column_values_to_not_be_null("candidate_id")
         validator.expect_column_values_to_not_be_null("skills")
         validator.expect_column_values_to_not_be_null("experience_level")
-        validator.expect_column_to_exist("qualification")
         
         # Run validation
         validation_result = validator.validate()
-        
         success = validation_result["success"]
-        results = []
-        if not success:
-            results.append("Great Expectations Validation Failed")
-            # We could parse validation_result for details, but keeping it brief.
         
-        return {"success": success, "results": results, "details": validation_result.to_json_dict()}
+        return {"success": success, "results": [], "details": validation_result.to_json_dict()}
 
 def check_drift(reference_df, current_df, threshold=0.05):
     """

@@ -21,22 +21,27 @@ class PredictionOutput(BaseModel):
     top_match: str
     confidence: float
 
-# Global model variable
+# Global variables
 model = None
+label_encoder = None
 
 @app.on_event("startup")
-def load_model():
-    global model
-    # [Anas]: Bootstrapping the model. 
-    # Checking for the artifact. In K8s, this passes via the 'MODEL_PATH' env var.
-    default_path = "models/production_pipeline.pkl"
-    model_path = os.getenv("MODEL_PATH", default_path)
-    if os.path.exists(model_path):
+def load_startup_artifacts():
+    global model, label_encoder
+    # [Anas]: Bootstrapping the artifacts.
+    model_path = os.getenv("MODEL_PATH", "models/production_pipeline.pkl")
+    le_path = os.getenv("LE_PATH", "models/label_encoder.pkl")
+    
     if os.path.exists(model_path):
         model = joblib.load(model_path)
         print(f"Loaded model from {model_path}")
-    else:
-        print("Warning: No model found at startup. Service will fail predictions.")
+    
+    if os.path.exists(le_path):
+        label_encoder = joblib.load(le_path)
+        print(f"Loaded label encoder from {le_path}")
+    
+    if not model or not label_encoder:
+        print("Warning: Missing artifacts at startup. Service will fail predictions.")
 
 @app.post("/predict", response_model=PredictionOutput)
 def predict(candidate: CandidateInput):
@@ -51,7 +56,10 @@ def predict(candidate: CandidateInput):
         # [Misem]: This is the key "Reframing" pattern.
         # We output the full probabilities so we can decide later if it's a "Maybe".
         probs = model.predict_proba(data)[0] 
-        classes = model.classes_
+        # [Misem]: Mapping probabilities using the discrete LabelEncoder classes.
+        # This ensures we always have the correct string labels ('Data Scientist', etc.)
+        classes = label_encoder.classes_
+        prob_dict = {str(c): float(p) for c, p in zip(classes, probs)}
         
         # Determine top match initially
         top_match = max(prob_dict, key=prob_dict.get)
