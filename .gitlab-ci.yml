@@ -1,0 +1,48 @@
+# GitLab CI/CD Pipeline
+# Repository: https://gitlab.com/maysamsgx
+
+variables:
+  DOCKER_IMAGE: "candidate-matching-service"
+  VERSION: "1.0.0"
+
+stages:
+  - test
+  - build
+  - deploy
+
+# Stage 1: Continuous Integration (Test)
+test_pipeline:
+  stage: test
+  image: python:3.11.9-slim
+  script:
+    - pip install -r requirements.txt
+    - pytest tests/ --junitxml=report.xml
+  artifacts:
+    reports:
+      junit: report.xml
+
+# Stage 2: Continuous Delivery (Build)
+build_image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t $DOCKER_IMAGE:$VERSION .
+    - docker tag $DOCKER_IMAGE:$VERSION $DOCKER_IMAGE:latest
+    # - docker push registry.gitlab.com/group/project/$DOCKER_IMAGE:$VERSION
+
+# Stage 3: Continuous Deployment (Simulated)
+deploy_to_staging:
+  stage: deploy
+  script:
+    - echo "Deploying to Staging Environment..."
+    - echo "Applying Kubernetes Manifests..."
+    # - kubectl apply -f k8s/deployment.yaml
+
+deploy_to_production:
+  stage: deploy
+  when: manual
+  script:
+    - echo "Deploying to Production Environment..."
+    # - kubectl set image deployment/candidate-service candidate-service=$DOCKER_IMAGE:$VERSION
