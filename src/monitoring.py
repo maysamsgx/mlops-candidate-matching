@@ -5,9 +5,10 @@ import json
 import os
 
 class DataValidator:
+    # [Mohammed Ali]: GE Validation.
+    # Validating batch against the defined expectation suite. 
+    # Failures here indicate Data Drift or Data Quality issues.
     """
-    [Mohammed Ali]: The Guardrail.
-    Using Great Expectations here. If data comes in garbage, we fail fast before hitting the model.
     """
     def __init__(self, context_root_dir="great_expectations"):
         self.context = gx.get_context(mode="ephemeral")

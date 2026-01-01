@@ -17,6 +17,18 @@ def load_data(path: str):
     # Filter rare classes to avoid CV errors in Stacking
     v = df['job_role'].value_counts()
     df = df[df['job_role'].isin(v[v >= 3].index)]
+    
+    # [Misem]: Implementing Manual Upsampling (Rebalancing Pattern).
+    # Since we can't rely on SMOTE without 'imblearn' package, we duplicate samples from rare classes 
+    # to help the ensemble pay attention to them.
+    max_size = v.max()
+    lst = [df]
+    for class_index, group in df.groupby('job_role'):
+        if len(group) < max_size // 2: # heuristic threshold
+            # Upsample
+            lst.append(group.sample(max_size // 2 - len(group), replace=True, random_state=42))
+    df = pd.concat(lst)
+    
     return df
 
 @task
@@ -59,13 +71,14 @@ def train_model(df: pd.DataFrame):
             ('skills_emb', SkillsEmbeddingTransformer(embedding_dim=16), ['skills']),
             ('qual_ord', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1), ['qualification']),
             ('exp_ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False), ['experience_level']),
-            # We add the cross generation and hashing as a separate pipeline branch?
-            # It's tricky with basic ColumnTransformer.
-            # We will perform Feature Cross separately or assume it's handled.
-            # Let's use the FeatureCrossTransformer in a separate pipeline that generates the column,
-            # then hashes it.
-            # BUT ColumnTransformer takes columns.
-            # We'll skip complex pipeline branching for this demo and focus on the main embeddings.
+            
+            # [Misem]: Adding the Feature Cross branch.
+            # Combining Experience + Skills Count -> OneHot Encoded.
+            # This captures strictly "Senior with Low Skills" vs "Junior with High Skills" signals.
+            ('cross_ohe', Pipeline([
+                ('cross', FeatureCrossTransformer()),
+                ('ohe', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
+            ]), ['experience_level', 'skills'])
         ],
         remainder='drop' 
     )
@@ -96,8 +109,11 @@ def train_model(df: pd.DataFrame):
         # Save Model
         mlflow.sklearn.log_model(pipeline, "model")
         
-        # Register Model (Simulated)
-        # mlflow.register_model(f"runs:/{run_id}/model", "CandidateMatcher")
+        # Register Model (Model Registry Pattern)
+        # Promoting the model to the central registry for version control.
+        # This allows the deployment stage to pick up the specific labeled version (e.g. "Staging").
+        encoded_model_uri = f"runs:/{mlflow.active_run().info.run_id}/model"
+        mlflow.register_model(encoded_model_uri, "CandidateMatcher")
 
     return pipeline, le
 
@@ -119,6 +135,11 @@ def main_flow():
         
     df = load_data(data_path)
     df_validated = validate_data(df)
+    
+    # [Misem]: Checkpoint Pattern.
+    # Saving valid data state so we can resume training without re-ingesting/validating if the pipeline fails later.
+    df_validated.to_parquet("item_checkpoint_valid.parquet", index=False)
+    
     pipeline, le = train_model(df_validated)
     save_for_serving(pipeline, le)
 

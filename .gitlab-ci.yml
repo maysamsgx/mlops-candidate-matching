@@ -16,6 +16,9 @@ test_pipeline:
   image: python:3.11.9-slim
   script:
     - pip install -r requirements.txt
+    - pip install flake8
+    - echo "Running Static Code Analysis (Linting)..."
+    - flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
     - pytest tests/ --junitxml=report.xml
   artifacts:
     reports:
@@ -32,17 +35,18 @@ build_image:
     - docker tag $DOCKER_IMAGE:$VERSION $DOCKER_IMAGE:latest
     # - docker push registry.gitlab.com/group/project/$DOCKER_IMAGE:$VERSION
 
-# Stage 3: Continuous Deployment (Simulated)
+# Stage 3: Continuous Deployment
 deploy_to_staging:
   stage: deploy
   script:
-    - echo "Deploying to Staging Environment..."
-    - echo "Applying Kubernetes Manifests..."
-    # - kubectl apply -f k8s/deployment.yaml
+    - echo "Deploying to Staging Environment (Kubernetes)..."
+    # Assuming KUBECONFIG is set in CI/CD variables
+    - kubectl apply -f k8s/deployment.yaml
+    - kubectl apply -f k8s/service.yaml
 
 deploy_to_production:
   stage: deploy
   when: manual
   script:
     - echo "Deploying to Production Environment..."
-    # - kubectl set image deployment/candidate-service candidate-service=$DOCKER_IMAGE:$VERSION
+    - kubectl set image deployment/candidate-matching-deployment candidate-matching-api=$DOCKER_IMAGE:$VERSION
